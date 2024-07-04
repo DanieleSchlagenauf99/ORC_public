@@ -6,7 +6,7 @@ import Configuration as conf
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
-import random
+
 
 # README: controllare se possibile non usare panda
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     pool.join()
     end = time.time()
     
-    # Time in nice format
+    # Print duration 
     conf.print_time(start, end)
     
     # List of viable or no viable point
