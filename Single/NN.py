@@ -3,13 +3,12 @@ import Configuration as conf
 import time 
 import tensorflow as tf
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers
 from tensorflow.keras.callbacks import EarlyStopping
-from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay
 
 
 # Plot flag
@@ -24,7 +23,7 @@ def model_creation(nx):
     state_out1 = layers.Dense(64, activation="relu")(inputs)
     state_out2 = layers.Dense(32, activation="relu")(state_out1)
     state_out3 = layers.Dense(16, activation="relu")(state_out2)
-
+   
     # Output layer: sigmoid similar probability 
     outputs = layers.Dense(1, activation='sigmoid')(state_out3)
     model = tf.keras.Model(inputs=inputs, outputs=outputs)  
@@ -53,11 +52,12 @@ if __name__ == "__main__":
     # print the img with the subbary of the network
     # tf.keras.utils.plot_model(model, to_file='model_summary.png', show_shapes=True)
    
-    # Stop the train if not significant increase in a given # epochs
+    # Stop the train if not significant learn in a given # epochs
     early_stopping = EarlyStopping(monitor='val_loss', patience=conf.patience, restore_best_weights=True)
 
     # Train and test of the model
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    # Check via Nadam also 
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate= conf.L_rate), loss='binary_crossentropy', metrics=['accuracy'])
     start = time.time()
     history = model.fit(train_data, train_label, epochs=conf.epochs, validation_data=(test_data, test_label), callbacks=[early_stopping])
     loss, accuracy = model.evaluate(test_data, test_label)
@@ -99,22 +99,38 @@ if __name__ == "__main__":
     
     
 if(PLOT):
-    # Confusion matrix
-    cm = confusion_matrix(test_label, prediction)
+    '''    
     plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='BuGn', xticklabels=['Non-Viable', 'Viable'], yticklabels=['Non-Viable', 'Viable'])
-    plt.xlabel('Predicted')
+    plt.imshow(cm, interpolation='nearest', cmap='BuGn')
+    plt.colorbar()
+    # Annotate the matrix with numerical values
+    for i, j in np.ndindex(cm.shape):
+        plt.text(j, i, format(cm[i, j], 'd'),  ha="center", va="center", color="red")
+    tick_marks = np.arange(len(['Non-Viable', 'Viable']))
+    plt.xticks(tick_marks, ['Non-Viable', 'Viable'])
+    plt.yticks(tick_marks, ['Non-Viable', 'Viable'])
     plt.ylabel('True')
+    plt.xlabel('Predicted')
     plt.title('Confusion Matrix')
     plt.show()
+    '''
+    cm = confusion_matrix(test_label, prediction)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Non-Viable", "Viable"])
+    cm_display.plot(ax=ax, cmap='BuGn')
+    plt.ylabel('True')
+    plt.xlabel('Predicted')
+    plt.title('Confusion Matrix')
+    plt.show()
+    
 
 
     # ROC curve
     fpr, tpr, _ = roc_curve(test_label, prediction)
     roc_auc = auc(fpr, tpr)
     plt.figure()
-    plt.plot(fpr, tpr, color='goldenrod', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
-    plt.plot([0, 1], [0, 1], color='purple', lw=2, linestyle='--')
+    plt.plot(fpr, tpr, color='goldenrod', lw=2, label=f'ROC curve (AUC = {roc_auc:.4f})')
+    plt.plot([0, 1], [0, 1], color='purple', lw=2, linestyle='--', label = f'random classificator')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic')
@@ -123,7 +139,7 @@ if(PLOT):
 
 
     # Loss && accuracy  
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 10))
     plt.subplot(2, 1, 1)
     plt.plot(history.history['loss'], label='Training Loss', color='darkgreen')
     plt.plot(history.history['val_loss'], label='Validation Loss', color='darkorange')
@@ -141,5 +157,6 @@ if(PLOT):
     plt.legend()
     plt.show()
 
+    
     
     

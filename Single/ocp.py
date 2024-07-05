@@ -4,7 +4,6 @@ import Dynamics
 import multiprocessing
 import Configuration as conf
 import matplotlib.pyplot as plt
-import pandas as pd
 import time
 
 
@@ -92,8 +91,8 @@ if __name__ == "__main__":
     ocp = OcpSinglePendulum()
     
     # Inital state grid
-    npos = 10
-    nvel = 10
+    npos = 50
+    nvel = 50
     state_array, n_ics = conf.grid(npos, nvel)
     
 
@@ -157,14 +156,20 @@ if __name__ == "__main__":
     ax.set_ylabel('dq [rad/s]')
     plt.show()
 
-    # Joint points 
+    # Joint vectors 
     viable_states = np.column_stack((viable_states, np.ones(len(viable_states), dtype=int)))
     no_viable_states = np.column_stack((no_viable_states, np.zeros(len(no_viable_states), dtype=int)))
     dataset = np.concatenate((viable_states, no_viable_states))
 
-    # Create a DataFrame starting from the final array
+
+
+    # Save the data into a cvs file
     columns = ['q', 'v', 'viable']
-    df = pd.DataFrame(dataset, columns=columns)
-    # Export DataFrame to csv format
-    df.to_csv('less_data.csv', index=False)
+    with open('data_single.csv', 'w') as f:
+        # intestazione
+        f.write(','.join(columns) + '\n')
+        # Usa numpy.savetxt per aggiungere i dati
+        np.savetxt(f, dataset, delimiter=',', fmt='%s')
+
+
 

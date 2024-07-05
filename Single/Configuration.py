@@ -4,15 +4,15 @@ np.set_printoptions(precision=3, linewidth=200, suppress=True)
 LINE_WIDTH = 60
 
 # Multiprocess
-processor = 2
+processor = 3
 
 # Time definition 
 T  = 1.0
 dt = 0.01
 N  = int(T/dt)
 
-# MAx number of iteration 
-iter = 1000  
+# Max number of iteration 
+iter = 5000  
 
 # Bounds: severe on position, lighter in velcoty and torque 
 # ADJUST THE WEIGHT!
@@ -35,14 +35,16 @@ nu = 1
 
 
 # ====== NN
-train_size     = 0.8    # Ratio of dataset in train set
-epochs         = 300    # Total epoches 
-patience       = 10     # Epochs to wait before early_stop
-#Learning_rate = 0.01   # Learing rate
+train_size = 0.8    # Ratio of dataset in train set
+epochs     = 300    # Total epoches 
+patience   = 10     # Epochs to wait before early_stop
+L_rate     = 0.001  # Learing rate, default value for both Adam && Nadam
 
 
 
 # ====== MCP
+
+
 
 
 
