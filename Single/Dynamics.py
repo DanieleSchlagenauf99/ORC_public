@@ -2,7 +2,6 @@ import numpy as np
 from casadi import sin 
 
 def f_single(x,u):
-    # Settings
     dt = 0.01
     l  = 1
     m  = 1
