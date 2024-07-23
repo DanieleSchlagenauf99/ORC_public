@@ -2,17 +2,15 @@ import numpy as np
 np.set_printoptions(precision=3, linewidth=200, suppress=True)
 LINE_WIDTH = 60
 
-# Multiprocess
-processor = 4
 
-# Time definition 
+## ==> Time definition 
 T    = 1.0
 dt   = 0.01
 N    = int(T/dt)
 iter = 1000    # Max number of iteration 
 
 
-# Bounds: copied from A2  
+## ==> Bounds from A2  
 #  Weights chosen to be tight on the position and lighter on velcoty and torque
 lowerPositionLimit = 3/4*np.pi
 upperPositionLimit = 5/4*np.pi
@@ -28,8 +26,9 @@ w_u = 1e-3
 
 # Target postion 
 q_target = 3/4*np.pi
+# Multiprocess
 
-
+processor = 4
 # Number of state and control 
 ns = 2
 nu = 1

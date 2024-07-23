@@ -6,7 +6,7 @@ import Dynamics
 import joblib
 from NN import model_creation  
 
-## ==> NB before run set the PLOT flag in NN is set  =0 
+## ==> NB before run ensure the PLOT flag in NN is set  =0 
 PLOT = 0
 
 class MpcSinglePendulum:
@@ -32,8 +32,7 @@ class MpcSinglePendulum:
 
     ## ==> NN from TensorFlow to casADi 
     def NN_with_sigmoid(self,params, x):
-        # param = weights 
-        # x = state
+        # param = weights && x = state
         out = np.array(x)
         it = 0
         for param in params:
@@ -43,7 +42,7 @@ class MpcSinglePendulum:
             else:
                 out = param + out  
                 if it == (len(params)-1):  
-                    out = 1 / (1 + cas.exp(-out))       # Sigmoid function in otput layer 
+                    out = 1 / (1 + cas.exp(-out))       # Sigmoid function on otput layer 
                 else:
                     out = cas.fmax(0., cas.MX(out[0]))  # ReLU function 
             it += 1
