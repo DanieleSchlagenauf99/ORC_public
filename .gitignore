@@ -1,5 +1,9 @@
 *:Zone.Identifier
 commit.txt
+data_single_14641.csv
+data_single.csv
+main.py
+prova.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

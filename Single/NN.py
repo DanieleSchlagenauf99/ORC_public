@@ -33,7 +33,7 @@ def model_creation(nx):   # as input the features's dimension
 
 if __name__ == "__main__":
     # Import data 
-    data_path = "data_single.csv"
+    data_path = "data100.csv"
     data = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
     dataset = data[:, :-1] 
     labels  = data[:, -1]
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     test_data  = scaler.transform(test_data)
     
     # Export scaler values
-    joblib.dump(scaler, 'scaler_single.pkl')
+    joblib.dump(scaler, 'scaler100.pkl')
     
     
     ## ==> Train and test of NN 
