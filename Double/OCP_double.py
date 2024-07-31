@@ -1,23 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import casadi as cas
-import Dynamics
+import Dynamics_double
 import multiprocessing
-import Configuration as conf
+import Configuration_double as conf
 
 import time
 
 
 
-class OcpSinglePendulum:
+class OcpDoublePendulum:
     def __init__(self):
         # Time 
         self.T   = conf.T                
         self.dt  = conf.dt    
         # Weights           
-        self.w_q = conf.w_q                           
-        self.w_v = conf.w_v   
-        self.w_u = conf.w_u 
+        self.w_q1 = conf.w_q1                           
+        self.w_v1 = conf.w_v1   
+        self.w_u1 = conf.w_u1 
+        self.w_q2 = conf.w_q2
+        self.w_v2 = conf.w_v2
+        self.w_u2 = conf.w_u2
         
     def solve(self, x_init, N ,X_guess = None, U_guess = None): 
         self.opti = cas.Opti()

@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import time 
 import joblib
 
-#from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers
 from tensorflow.keras.callbacks import EarlyStopping
-from sklearn.metrics import confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
 # Plot flag: disable to run MPC
@@ -24,8 +24,8 @@ def model_creation(nx):   # as input the features's dimension
     state_out2 = layers.Dense(32, activation="relu")(state_out1)
     state_out3 = layers.Dense(16, activation="relu")(state_out2)
     # Output layer: sigmoid similar probability 
-    #outputs = layers.Dense(1, activation='relu')(state_out3)
     outputs = layers.Dense(1, activation='sigmoid')(state_out3)
+    #outputs = layers.Dense(1, activation='relu')(state_out3)
     
     model = tf.keras.Model(inputs = inputs, outputs = outputs)  
     return model
@@ -33,28 +33,23 @@ def model_creation(nx):   # as input the features's dimension
 
 if __name__ == "__main__":
     # Import data 
-    data_path = "data100.csv"
+    data_path = "data_single.csv"
     data = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
-    dataset = data[:, :2] 
-    labels  = data[:, 2]
+    dataset = data[:, :-1] 
+    labels  = data[:, -1]
+    scaler = StandardScaler()
     
-
-    # Train and test set creation
-    train_data, test_data, train_label, test_label = train_test_split(dataset,labels, train_size=conf.train_size, random_state=29)
-
-    ## ==> Scale to fast convergence
-    # Commented to have comparable scale 
-    #scaler = StandardScaler()
-    #train_data = scaler.fit_transform(train_data)
-    #print(f'{scaler.mean_} and {scaler.scale_}')
-    #joblib.dump(scaler, 'scalerA100.pkl')            # Export trained scaler 
-    #test_data  = scaler.transform(test_data)
-    #print(f'{scaler.mean_}
-    # and {scaler.scale_}')
-
-
+    # Train and test set creation with scaler 
+    train_data, test_data, train_label, test_label = train_test_split(dataset,labels, train_size=conf.train_size, random_state=31)
+    train_data = scaler.fit_transform(train_data)
+    test_data  = scaler.transform(test_data)
+    
+    # Export scaler values
+    joblib.dump(scaler, 'scaler_single.pkl')
+    
+    
     ## ==> Train and test of NN 
-    model = model_creation(nx=train_data.shape[1])   # COULD pass the ns form conf
+    model = model_creation(nx=conf.ns)   
     model.summary()
    
     # Stop the train if not significant learn in a given # epochs
@@ -68,8 +63,10 @@ if __name__ == "__main__":
     # Test
     loss, accuracy = model.evaluate(test_data, test_label)
     end = time.time()
+    print('\n')
     conf.print_time(start, end)
     print(f'Loss: {loss}, Accuracy: {accuracy}')
+    print('\n')
     
     
     ## ==> Export NN weights 
@@ -77,18 +74,18 @@ if __name__ == "__main__":
     
 
 
-    ## ==> Viability 
+    ## ==> Check NN Viability kernel 
     # Predicted state, ensuring to be 0 or 1
-    # DIsable scale
-    #test_data = scaler.fit_transform(test_data)
-    #print(f'{scaler.mean_} and {scaler.scale_}')
-    #joblib.dump(scaler, 'scaler100.pkl') 
-    pred = model.predict(test_data)
-    prediction = np.round(pred).flatten()
-
-
-    viable_states    = test_data[prediction == 1.0]
-    no_viable_states = test_data[prediction == 0.0]      
+    data    = np.genfromtxt("data_single.csv", delimiter=",", skip_header=1)  
+    dataset = data[:, :-1] 
+    label   = data[:, -1]
+    Norm_dataset = scaler.fit_transform(dataset)
+    label_pred   = model.predict(Norm_dataset)
+    prediction   = np.round(label_pred).flatten()
+    
+    
+    viable_states    = dataset[prediction == 1.0]
+    no_viable_states = dataset[prediction == 0.0]  
     viable_states    = np.array(viable_states)
     no_viable_states = np.array(no_viable_states)
     
@@ -105,29 +102,18 @@ if __name__ == "__main__":
     ax.set_xlabel('q [rad]')
     ax.set_ylabel('dq [rad/s]')
     plt.show()
+   
     
 ## ==> NN evaluation plot 
 if(PLOT):
     # Confusion matrix    
-    cm = confusion_matrix(test_label, prediction)
+    cm = confusion_matrix(label, prediction)
     fig, ax = plt.subplots(figsize=(8, 6))
     cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Non-Viable", "Viable"])
     cm_display.plot(ax=ax, cmap='BuGn')
     plt.ylabel('True')
     plt.xlabel('Predicted')
     plt.title('Confusion Matrix')
-    plt.show()
-     
-    # ROC curve
-    fpr, tpr, _ = roc_curve(test_label, prediction)
-    roc_auc = auc(fpr, tpr)
-    plt.figure()
-    plt.plot(fpr, tpr, color='goldenrod', lw=2, label=f'ROC curve (AUC = {roc_auc:.4f})')
-    plt.plot([0, 1], [0, 1], color='purple', lw=2, linestyle='--', label = f'random classificator')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic')
-    plt.legend(loc='lower right')
     plt.show()
 
     # Loss && accuracy  

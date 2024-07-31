@@ -1,5 +1,5 @@
 import numpy as np 
-from casadi import sin 
+import casadi as cas 
 
 def f_single(x,u):
     dt = 0.01
@@ -11,9 +11,12 @@ def f_single(x,u):
     q, dq = x[0], x[1]
     
     # Acceleration 
-    ddq = -g / l * sin(q) + u / (m * l**2) 
+    ddq = -g / l * cas.sin(q) + u / (m * l**2) 
     
     # Next step
     x_next = x + dt * (np.array([dq,ddq]))
-    
+
     return x_next
+
+
+
