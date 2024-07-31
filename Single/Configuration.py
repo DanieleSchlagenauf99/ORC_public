@@ -1,10 +1,12 @@
 import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 np.set_printoptions(precision=3, linewidth=200, suppress=True)
 LINE_WIDTH = 60
 
 
 ## ==> Time definition 
-T    = 1.0
+T    = 0.5
 dt   = 0.01
 N    = int(T/dt)
 iter = 1000    # Max number of iteration 
@@ -14,21 +16,21 @@ iter = 1000    # Max number of iteration
 #  Weights chosen to be tight on the position and lighter on velcoty and torque
 lowerPositionLimit = 3/4*np.pi
 upperPositionLimit = 5/4*np.pi
-w_q = 1e3
+w_q = 1e2
 
 lowerVelocityLimit = -10
 upperVelocityLimit = 10
-w_v = 1e-3
+w_v = 1e-1
 
 lowerControlBound = -9.81
 upperControlBound = 9.81
-w_u = 1e-3
+w_u = 1e-4
 
 # Target postion 
-q_target = 3/4*np.pi
+q_target = 5/4 * np.pi
 # Multiprocess
 
-processor = 4
+processor = 3
 # Number of state and control 
 ns = 2
 nu = 1
@@ -43,8 +45,8 @@ L_rate     = 0.001  # Learing rate, default value for both Adam && Nadam
 
 
 # ======= MCP
-TC_on         = 1                      # flag for terminal constrains
-initial_state = np.array([np.pi, 2.5])   # I.C.
+TC_on         =  1                     # flag for terminal constrains
+initial_state = np.array([np.pi, 1])   # I.C.
 mpc_step      = 100             
 
 ## ==> Noise (To use?)
@@ -72,3 +74,5 @@ def print_time(start, end):  # as input the timestamp in UNIX
     m, sec = divmod(r, 60)
     
     print(f'Computation time: {h}h  {m}min  {int(sec)}s')
+
+

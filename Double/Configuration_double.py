@@ -4,9 +4,9 @@ LINE_WIDTH = 60
 
 
 ## ==> Time definition 
-T    = 0.5
+T    = 0.2
 dt   = 0.01
-N    = int(T/dt)
+N    = int(T/dt)    
 iter = 1000     
 
 
@@ -72,8 +72,8 @@ def grid(pos1, vel1 ,pos2, vel2):    # as input the grid wanted dimension
     state_array = np.zeros((n_ics,(ns)))
     lin_p1      = np.linspace(lowerPositionLimit1, upperPositionLimit1, num=pos1)
     lin_p2      = np.linspace(lowerPositionLimit2, upperPositionLimit2, num=pos2)
-    lin_v1       = np.linspace(lowerVelocityLimit1, upperVelocityLimit1, num=vel1)
-    lin_v2       = np.linspace(lowerVelocityLimit2, upperVelocityLimit2, num=vel2)
+    lin_v1      = np.linspace(lowerVelocityLimit1, upperVelocityLimit1, num=vel1)
+    lin_v2      = np.linspace(lowerVelocityLimit2, upperVelocityLimit2, num=vel2)
     
     ######## indexing TO CHECK for reference index defition (work also without)
     grid = np.meshgrid(lin_p1, lin_v1, lin_p2, lin_v2, indexing='ij')
