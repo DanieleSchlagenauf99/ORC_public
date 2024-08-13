@@ -1,5 +1,5 @@
 import numpy as np
-import Configuration as conf
+import Configuration_double as conf
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import time 
@@ -11,21 +11,25 @@ from tensorflow.keras import layers
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
+# Set print options
+np.set_printoptions(precision=3, linewidth=200, suppress=True)
 
-# Plot flag: disable to run MPC
-PLOT = 0
+TEST = 0    # Plot flag: disable to run MPC
 
-## ==> NN model creation
+## ==> NN MODEL
 def model_creation(nx):   # as input the features's dimension
     # Input layer
     inputs = layers.Input(shape=(nx,))
+    
     # Hidden layers check
     state_out1 = layers.Dense(64, activation="relu")(inputs)
-    state_out2 = layers.Dense(32, activation="relu")(state_out1)
-    state_out3 = layers.Dense(16, activation="relu")(state_out2)
-    # Output layer: sigmoid similar probability 
+    dropout1   = layers.Dropout(0.1)(state_out1)
+    state_out2 = layers.Dense(32, activation="relu")(dropout1)
+    dropout2   = layers.Dropout(0.1)(state_out2)
+    state_out3 = layers.Dense(16, activation="relu")(dropout2)
+    
+    # Output layer: by usign sigmoid the output is bounded between 0 and 1 
     outputs = layers.Dense(1, activation='sigmoid')(state_out3)
-    #outputs = layers.Dense(1, activation='relu')(state_out3)
     
     model = tf.keras.Model(inputs = inputs, outputs = outputs)  
     return model
@@ -33,79 +37,59 @@ def model_creation(nx):   # as input the features's dimension
 
 if __name__ == "__main__":
     # Import data 
-    data_path = "data100.csv"
-    data = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
-    dataset = data[:, :-1] 
-    labels  = data[:, -1]
-    scaler = StandardScaler()
+    data_path = "data_54.csv"
+    data      = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
+    dataset   = data[:, :-1] 
+    labels    = data[:, -1]
+    scaler    = StandardScaler()
     
-    # Train and test set creation with scaler 
+    ## ==> TRAIN AND TEST
+    # Creation of the set
     train_data, test_data, train_label, test_label = train_test_split(dataset,labels, train_size=conf.train_size, random_state=31)
+    
+    # scaling
     train_data = scaler.fit_transform(train_data)
     test_data  = scaler.transform(test_data)
-    
-    # Export scaler values
-    joblib.dump(scaler, 'scaler100.pkl')
-    
-    
-    ## ==> Train and test of NN 
+    # Save scaler data 
+    joblib.dump(scaler, 'scaler54.pkl')
+
     model = model_creation(nx=conf.ns)   
     model.summary()
    
-    # Stop the train if not significant learn in a given # epochs
+    # Early stopping: used to stop the training when the learn is constant for a given period (patience)
     early_stopping = EarlyStopping(monitor='val_loss', patience=conf.patience, restore_best_weights=True)
 
-    # Train (Could be implemented by Nadam)
+    ## ==> TRAINING & TEST
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate= conf.L_rate), loss='binary_crossentropy', metrics=['accuracy'])
     start = time.time()
-    history = model.fit(train_data, train_label, epochs=conf.epochs, validation_data=(test_data, test_label), callbacks=[early_stopping])
+    history = model.fit(train_data, train_label, epochs=conf.epochs, validation_data=(test_data, test_label), callbacks=[early_stopping], batch_size = 64)
+
     
     # Test
     loss, accuracy = model.evaluate(test_data, test_label)
-    end = time.time()
+    end = time.time()       
     print('\n')
     conf.print_time(start, end)
     print(f'Loss: {loss}, Accuracy: {accuracy}')
     print('\n')
     
-    
-    ## ==> Export NN weights 
-    model.save_weights("single_w.weights.h5", overwrite = True)
+    ## ==> SAVE WEIGHTS  
+    model.save_weights("w54.weights.h5", overwrite = True)
     
 
-
-    ## ==> Check NN Viability kernel 
-    # Predicted state, ensuring to be 0 or 1
-    data    = np.genfromtxt("data50.csv", delimiter=",", skip_header=1)  
+if(TEST):
+    
+    data    = np.genfromtxt("test54.csv", delimiter=",", skip_header=1)  
     dataset = data[:, :-1] 
     label   = data[:, -1]
     Norm_dataset = scaler.fit_transform(dataset)
     label_pred   = model.predict(Norm_dataset)
+
+    # Predicted state, ensuring to be 0 or 1
     prediction   = np.round(label_pred).flatten()
     
-    
-    viable_states    = dataset[prediction == 1.0]
-    no_viable_states = dataset[prediction == 0.0]  
-    viable_states    = np.array(viable_states)
-    no_viable_states = np.array(no_viable_states)
-    
-    
-    ## ==> Plot state space     
-    fig = plt.figure(figsize=(12,8))
-    ax = fig.add_subplot()
-    if len(viable_states) != 0:
-        ax.scatter(viable_states[:,0], viable_states[:,1], c='c', label='viable')
-        ax.legend()
-    if len(no_viable_states) != 0:
-        ax.scatter(no_viable_states[:,0], no_viable_states[:,1], c='m', label='non-viable')
-        ax.legend()
-    ax.set_xlabel('q [rad]')
-    ax.set_ylabel('dq [rad/s]')
-    plt.show()
-   
-    
-## ==> NN evaluation plot 
-if(PLOT):
+        
+    # Plots 
     # Confusion matrix    
     cm = confusion_matrix(label, prediction)
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -134,7 +118,3 @@ if(PLOT):
     plt.ylabel('Accuracy')
     plt.legend()
     plt.show()
-
-    
-    
-    

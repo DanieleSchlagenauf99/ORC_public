@@ -1,13 +1,14 @@
 import numpy as np 
 import casadi as cas 
+import Configuration as conf
 
 def f_single(x,u):
-    dt = 0.01
-    l  = 1
-    m  = 1
-    g  = 9.81
+    dt = conf.dt  # Time step
+    l  = 1        # Length 
+    m  = 1        # Mass
+    g  = 9.81     # Gravity 
     
-    # State as postion and velocity 
+    # State as (q, v) 
     q, dq = x[0], x[1]
     
     # Acceleration 

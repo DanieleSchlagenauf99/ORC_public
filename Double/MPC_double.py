@@ -1,135 +1,153 @@
-############
-# MPC only with Sigmoid
-
-
 import numpy as np
 import casadi as cas
 import matplotlib.pyplot as plt
-import Configuration as conf
-import Dynamics 
+import Configuration_double as conf
+import Dynamics_double as dyn
 import joblib
-from NN import model_creation 
+import time
+from NN_double import model_creation  
+from matplotlib import animation
 
-## ==> NB before run set the PLOT flag in NN is set  =0 
+# Set print options
+np.set_printoptions(precision=3, linewidth=200, suppress=True)
+
+## ==> NB before run ensure the PLOT flag in NN is set  =0 
 PLOT = 1
+Animation = 1
 
-class MpcSinglePendulum:
+class MpcDoublePendulum:
     def __init__(self):
-        # Time && Weights
+        # Time 
         self.T   = conf.T                   
         self.dt  = conf.dt               
-        self.w_q = conf.w_q                 
-        self.w_u = conf.w_u                 
-        self.w_v = conf.w_v         
+        # Weights 
+        self.w_q1 = conf.w_q1               
+        self.w_u1 = conf.w_u1               
+        self.w_v1 = conf.w_v1
+        self.w_q2 = conf.w_q2                 
+        self.w_u2 = conf.w_u2                 
+        self.w_v2 = conf.w_v2         
                 
-        # NN
+        # Creation of NN with the computed weights
         self.model   = model_creation(conf.ns)        
-        self.model.load_weights("single_w.weights.h5")
+        self.model.load_weights("w11.weights.h5")
         self.weights = self.model.get_weights()
         
-        # Scaler 
-        self.scaler  = joblib.load('scaler100.pkl')
+        # Scaler    
+        self.scaler = joblib.load('scaler11.pkl')
         self.sc_mean = self.scaler.mean_
         self.sc_scale = self.scaler.scale_
+    
 
-
-    ## ==> NN from TensorFlow to casADi 
-    def NN_with_sigmoid(self, params, x):
-        out = cas.MX(x)  # Ensure `x` is a CasADi MX object
+    ## ==> TENSORFLOW TO CASADI
+    def NN_with_sigmoid(self,params, x):
+        out = cas.MX(x)  
         iteration = 0
-    
         for param in params:
-            param = cas.MX(np.array(param.tolist()))  # Convert to CasADi MX object
-    
+            param = cas.MX(np.array(param.tolist()))   
             if iteration % 2 == 0:
-                out = param.T @ out  # Matrix multiplication
+                out = param.T @ out               # Linear layer  
             else:
-                out = param + out  # Addition
+                out = param + out                 # Add bias
                 if iteration < len(params) - 1:
-                    out = cas.fmax(0., out)  # Apply ReLU for hidden layers
+                    out = cas.fmax(0., out)       # ReLU 
     
             iteration += 1
-    
-        # Apply sigmoid activation function only on the final layer
-        out = 1 / (1 + cas.exp(-out))
-        
+        out = 1 / (1 + cas.exp(-out))             # Sigmoid 
         return out
-
-
-
 
     
     def solve(self, x_init, N, X_guess = None, U_guess = None): 
         self.opti = cas.Opti()
-        self.q    = self.opti.variable(N)       
-        self.v    = self.opti.variable(N)
-        self.u    = self.opti.variable(N-1)
-        q = self.q
-        v = self.v
-        u = self.u
+        self.q1 = self.opti.variable(N)       
+        self.v1 = self.opti.variable(N)
+        self.u1 = self.opti.variable(N-1)
+        self.q2 = self.opti.variable(N)       
+        self.v2 = self.opti.variable(N)
+        self.u2 = self.opti.variable(N-1)
+        q1 = self.q1
+        v1 = self.v1
+        u1 = self.u1
+        q2 = self.q2
+        v2 = self.v2
+        u2 = self.u2
         
         # Initialization 
         if (X_guess is not None):                           # State
             for i in range(N):
-                self.opti.set_initial(q[i], X_guess[i,0])
-                self.opti.set_initial(v[i], X_guess[i,1]) 
+                self.opti.set_initial(q1[i], X_guess[i,0])
+                self.opti.set_initial(v1[i], X_guess[i,1]) 
+                self.opti.set_initial(q2[i], X_guess[i,2])
+                self.opti.set_initial(v2[i], X_guess[i,3]) 
         else:
             for i in range(N):
-                self.opti.set_initial(q[i], x_init[0])
-                self.opti.set_initial(v[i], x_init[1])
+                self.opti.set_initial(q1[i], x_init[0])
+                self.opti.set_initial(v1[i], x_init[1])
+                self.opti.set_initial(q2[i], x_init[2])
+                self.opti.set_initial(v2[i], x_init[3])
         
         if (U_guess is not None):                           # Input
             for i in range(N-1):
-                self.opti.set_initial(u[i], U_guess[i])
+                self.opti.set_initial(u1[i], U_guess[i,0])
+                self.opti.set_initial(u2[i], U_guess[i,1])
                 
              
         
-        ## ==> Running cost 
+        ## ==> COST FUNCTION
         self.cost = 0
         self.running_costs = [None,]*(N)      
         for i in range(N):
-            self.running_costs[i] =  self.w_q * (q[i] - conf.q_target)**2       # Position 
-            self.running_costs[i] += self.w_v * v[i]**2                         # Velocity
-            if (i<N-1):            
-                self.running_costs[i] += self.w_u * u[i]**2                     # Input 
+            self.running_costs[i]  =  self.w_q1 * (q1[i] - conf.q1_target)**2  # q1 
+            self.running_costs[i] += self.w_v1 * v1[i]**2                      # dq1
+            self.running_costs[i] +=  self.w_q2 * (q2[i] - conf.q2_target)**2  # q2 
+            self.running_costs[i] += self.w_v2 * v2[i]**2                      # dq2
+            if (i<N-1):       
+                self.running_costs[i] += self.w_u1 * u1[i]**2                  # u1
+                self.running_costs[i] += self.w_u2 * u2[i]**2                  # u2 
             self.cost += self.running_costs[i]
+            
         self.opti.minimize(self.cost)     
 
-
-        ## ==> Terminal cost 
-        state      = [q[N-1], v[N-1]]
-        state_norm = (state - self.sc_mean) / self.sc_scale 
-        state_norm = [state_norm[0], state_norm[1]] 
+        ## ==> CONSTRAINS
+        # Terminal constrains using the NN
+        state = [q1[N-1], v1[N-1],q2[N-1], v2[N-1]]
+        state_norm = (state - self.sc_mean) / self.sc_scale
+        state_norm = [state_norm[0], state_norm[1], state_norm[2], state_norm[3]] 
         state_mx   = cas.vertcat(*state_norm)
         
         if conf.TC_on:
             nn_output = self.NN_with_sigmoid(self.weights, state_mx)
-            self.opti.subject_to(nn_output > (1 - 5e-5))
+            self.opti.subject_to(nn_output >= conf.TC_limit)
 
 
-        ## ==> Constrains
         # Initial state 
-        self.opti.subject_to(q[0] == x_init[0])
-        self.opti.subject_to(v[0] == x_init[1])
+        self.opti.subject_to(q1[0] == x_init[0])
+        self.opti.subject_to(v1[0] == x_init[1])
+        self.opti.subject_to(q2[0] == x_init[2])
+        self.opti.subject_to(v2[0] == x_init[3])
         
         for i in range(N):
             # Bounded state
-            self.opti.subject_to(self.opti.bounded(conf.lowerPositionLimit, q[i], conf.upperPositionLimit))
-            self.opti.subject_to(self.opti.bounded(conf.lowerVelocityLimit, v[i], conf.upperVelocityLimit))
+            self.opti.subject_to(self.opti.bounded(conf.lowerPositionLimit1, q1[i], conf.upperPositionLimit1))
+            self.opti.subject_to(self.opti.bounded(conf.lowerVelocityLimit1, v1[i], conf.upperVelocityLimit1))
+            self.opti.subject_to(self.opti.bounded(conf.lowerPositionLimit2, q2[i], conf.upperPositionLimit2))
+            self.opti.subject_to(self.opti.bounded(conf.lowerVelocityLimit2, v2[i], conf.upperVelocityLimit2))
             
             if (i<N-1):
                 # Dynamics
-                x_plus = Dynamics.f_single(np.array([q[i], v[i]]), u[i])
-                self.opti.subject_to(q[i+1] == x_plus[0])
-                self.opti.subject_to(v[i+1] == x_plus[1])
+                x_plus = dyn.f_double(np.array([q1[i], v1[i], q2[i], v2[i]]), np.array([u1[i], u2[i]]))
+                self.opti.subject_to(q1[i+1] == x_plus[0])
+                self.opti.subject_to(v1[i+1] == x_plus[1])
+                self.opti.subject_to(q2[i+1] == x_plus[2])
+                self.opti.subject_to(v2[i+1] == x_plus[3])
                 # Bounded Torque
-                self.opti.subject_to(self.opti.bounded(conf.lowerControlBound, u[i], conf.upperControlBound))
+                self.opti.subject_to(self.opti.bounded(conf.lowerControlBound1, u1[i], conf.upperControlBound1))
+                self.opti.subject_to(self.opti.bounded(conf.lowerControlBound2, u2[i], conf.upperControlBound2))
                
         
-        ## ==> Chosing solver
-        opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
-        s_opst = {"max_iter": int(conf.iter), 'tol' : 1e-3}
-        #p_opts = {"expand": True}
+        ## ==> SOLVER
+        opts   = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
+        s_opst = {"max_iter": int(conf.iter), "tol": 1e-3}
         self.opti.solver("ipopt", opts, s_opst)
         return self.opti.solve()
 
@@ -138,28 +156,29 @@ class MpcSinglePendulum:
 
 if __name__ == "__main__":
 
-    # Instance of OCP solver
-    mpc = MpcSinglePendulum()
+    # MPC problem
+    mpc = MpcDoublePendulum()
     
-    # Empty list 
-    actual_trajectory = []                    
-    actual_inputs     = []   
-    
-    # Inital state append       
+    # Array of actual trajectory, starting from I.C
+    actual_trajectory, actual_inputs = [], []                          
     actual_trajectory.append(conf.initial_state)
          
-    # Initial Guess 
-    new_state_guess = np.zeros((conf.N,2))
-    new_input_guess = np.zeros(((conf.N)-1))
-    
-    # Update the state and input guesses for the next MPC iteration
+    start = time.time() 
+    # MPC iteration
     for i in range(conf.mpc_step):      
         new_init_state = actual_trajectory[i]
         try:
+            # First step, without any guess
             if (i == 0): 
                 sol =  mpc.solve(new_init_state, conf.N) 
+                # Define the guess array 
+                new_state_guess = np.zeros((conf.N,conf.ns))
+                new_input_guess = np.zeros(((conf.N)-1, conf.nu))
+                
+            # With guess
             else:
                 sol = mpc.solve(new_init_state, conf.N ,new_state_guess, new_input_guess)
+        
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print(f'\n########################################')
@@ -170,83 +189,122 @@ if __name__ == "__main__":
             else:
                 print(f'Runtime error: {e}')
                 break
-                
-        actual_trajectory.append(np.array([sol.value(mpc.q[1]), sol.value(mpc.v[1])]))
-        actual_inputs.append(sol.value(mpc.u[0]))
-
-        # New guess
-        new_state_guess[:-1, 0] = sol.value(mpc.q[1:]).reshape(-1)
-        new_state_guess[:-1, 1] = sol.value(mpc.v[1:]).reshape(-1)
-        new_input_guess[:-1]    = sol.value(mpc.u[1:]).reshape(-1)
         
-        last_state = np.array([sol.value(mpc.q[-1]), sol.value(mpc.v[-1])])
-        last_input = sol.value(mpc.u[-1])
-        next_state = Dynamics.f_single(last_state, last_input) 
+        # Append first step 
+        actual_trajectory.append(np.array([sol.value(mpc.q1[1]), sol.value(mpc.v1[1]),sol.value(mpc.q2[1]), sol.value(mpc.v2[1])]))
+        actual_inputs.append(np.array([sol.value(mpc.u1[0]), sol.value(mpc.u2[0])]))
+
+         ## ==> NEW GUESS
+        # Copy in the guess array the obtained solutions, except for the first step 
+        new_state_guess[:-1, 0] = sol.value(mpc.q1[1:]).reshape(-1)
+        new_state_guess[:-1, 1] = sol.value(mpc.v1[1:]).reshape(-1)
+        new_state_guess[:-1, 2] = sol.value(mpc.q2[1:]).reshape(-1)
+        new_state_guess[:-1, 3] = sol.value(mpc.v2[1:]).reshape(-1)
+        new_input_guess[:-1, 0] = sol.value(mpc.u1[1:]).reshape(-1)
+        new_input_guess[:-1, 1] = sol.value(mpc.u2[1:]).reshape(-1)
+        
+        # The last guess's element is computed by means of the dynmaics 
+        last_state = np.array([sol.value(mpc.q1[1]), sol.value(mpc.v1[1]),sol.value(mpc.q2[1]), sol.value(mpc.v2[1])])
+        last_input = np.array([sol.value(mpc.u1[0]), sol.value(mpc.u2[0])])
+        next_state = dyn.f_double(last_state, last_input) 
         
         new_state_guess[-1, 0] = next_state[0]
-        new_state_guess[-1, 1] = next_state[1]  
-        new_input_guess[-1]    = last_input
+        new_state_guess[-1, 1] = next_state[1] 
+        new_state_guess[-1, 2] = next_state[2]
+        new_state_guess[-1, 3] = next_state[3]  
+        new_input_guess[-1, 0] = last_input[0]     # copy last input in the last postion 
+        new_input_guess[-1, 1] = last_input[1]    
         
-        print(f'Step: {i+1} /  {conf.mpc_step}')
+        print(f'Step: {i+1} / {conf.mpc_step}')
     
+    end = time.time()
+    conf.print_time(start, end)
     
-    # Extract positions and velocities from the actual trajectory    
-    positions = []
-    velocities = []
-    for i in range(len(actual_trajectory)):
-        positions.append(actual_trajectory[i][0])
-        velocities.append(actual_trajectory[i][1])
+    # Extract positions and velocities from the actual trajectory 
+    positions1  = [actual_trajectory[i][0] for i in range(len(actual_trajectory))] 
+    velocities1 = [actual_trajectory[i][1] for i in range(len(actual_trajectory))]   
+    positions2  = [actual_trajectory[i][2] for i in range(len(actual_trajectory))] 
+    velocities2 = [actual_trajectory[i][3] for i in range(len(actual_trajectory))]    
 
-
-
-    ## ==> Compute the viable set using the NN  
-    dataset = conf.grid(100,100)[0]
-    Norm_dataset = mpc.scaler.fit_transform(dataset)
-    label_pred  = mpc.model.predict(Norm_dataset)
-    prediction  = np.round(label_pred).flatten()
     
-    viable_states    = dataset[prediction == 1.0]
-    no_viable_states = dataset[prediction == 0.0]  
-    viable_states    = np.array(viable_states)
-    no_viable_states = np.array(no_viable_states)
-
-    fig = plt.figure(figsize=(12,8))
-    ax = fig.add_subplot()
-    if len(viable_states) != 0:
-        ax.scatter(viable_states[:,0], viable_states[:,1], c='c', label='viable')
-        ax.legend()
-
-    if len(no_viable_states) != 0:
-        ax.scatter(no_viable_states[:,0], no_viable_states[:,1], c='m', label='non-viable')
-        ax.legend()
-    ax.scatter(positions, velocities, color='black', label='MPC')
-    ax.legend()
-    ax.set_xlabel('q [rad]')
-    ax.set_ylabel('dq [rad/s]')
-    plt.show()
-
-    # Torque plot
     if (PLOT == 1):
-        fig = plt.figure(figsize=(12,8))
-        plt.plot(actual_inputs)
-        plt.xlabel('mpc step')
-        plt.ylabel('u [N/m]')
-        plt.title('Torque')
+        # Torque plot      
+        first  = [arr[0] for arr in actual_inputs]
+        second = [arr[1] for arr in actual_inputs]
+        plt.figure(1, figsize=(12,8))
+        plt.plot(first, c='red',   label='First pendulum')
+        plt.plot(second, c='green', label='Second pendulum')
+        plt.xlabel('mcp step')
+        plt.ylabel('Torques [N/m]')
+        plt.title('Torque evolutions')
+        plt.legend()  
         plt.show()
+        
+        # Pendulum plot
+        plt.figure(2)
+        plt.plot(positions1, velocities1, c='red')
+        plt.xlabel('q1 [rad]')
+        plt.ylabel('v1 [rad/s]')
+        plt.title('First pendulum')
+        
+        plt.figure(3)
+        plt.plot(positions2, velocities2, c='green')
+        plt.xlabel('q2 [rad]')
+        plt.ylabel('v2 [rad/s]')
+        plt.title('Second pendulum')
+        plt.show()
+        
+        
+        
+    if (Animation == 1):
+        # Cartesian coordinate 
+        def get_x1y1x2y2(the1, the2, L1, L2):
+            return (L1 * np.sin(the1),
+                    -L1 * np.cos(the1),
+                    L1 * np.sin(the1) + L2 * np.sin(the2),
+                    -L1 * np.cos(the1) - L2 * np.cos(the2))
 
-        # Position plot
-        fig = plt.figure(figsize=(12,8))
-        plt.plot(positions)
-        plt.xlabel('mpc step')
-        plt.ylabel('q [rad]')
-        plt.title('Position')
+        
+        q1 = [arr[0] for arr in actual_trajectory]
+        q2 = [arr[2] for arr in actual_trajectory]
+        x1, y1, x2, y2 = get_x1y1x2y2(q1, q2, 1, 1)
+
+        def animate(i):
+            ln1.set_data([0, x1[i]], [0, y1[i]])
+            ln2.set_data([x1[i], x2[i]], [y1[i], y2[i]])
+
+            # Update the cone for the second pendulum
+            cone2_1.set_data([x1[i], x1[i] + np.sin(conf.lowerPositionLimit2)], 
+                             [y1[i], y1[i] - np.cos(conf.lowerPositionLimit2)])
+            cone2_2.set_data([x1[i], x1[i] + np.sin(conf.upperPositionLimit2)], 
+                             [y1[i], y1[i] - np.cos(conf.upperPositionLimit2)])
+            cone2_3.set_data([x1[i], x1[i]], 
+                             [y1[i], y1[i] +1])
+            
+            step_text.set_text(f'mcp_step: {i+1}')
+
+        fig, ax = plt.subplots(1, 1)
+        ax.set_facecolor('k')
+        ax.get_xaxis().set_ticks([])  # enable this to hide x axis ticks
+        ax.get_yaxis().set_ticks([])  # enable this to hide y axis ticks
+        ln1, = ax.plot([], [], 'rh-', lw=5, markersize=12)
+        ln2, = ax.plot([], [], 'gh-', lw=5, markersize=12)
+        ax.set_ylim(-2.5, 2.5)
+        ax.set_xlim(-2.5, 2.5)
+
+
+        # Cono per il primo pendolo
+        ax.plot([0, np.sin(conf.lowerPositionLimit1)], [0, -np.cos(conf.lowerPositionLimit1)], 'w-', lw=2)
+        ax.plot([0, np.sin(conf.upperPositionLimit1)], [0, -np.cos(conf.upperPositionLimit1)], 'w-', lw=2)
+        ax.plot([0, 0], [0, 1], 'c--', lw=1)
+
+        # Cono per il secondo pendolo (inizialmente vuoto, sarà aggiornato dall'animazione)
+        cone2_1, = ax.plot([], [], 'w-', lw=2)
+        cone2_2, = ax.plot([], [], 'w-', lw=2)
+        cone2_3, = ax.plot([], [], 'c--', lw=1)
+        
+        step_text = ax.text(0.05, 0.9, '', transform=ax.transAxes, color='white', fontsize=15)
+        ani = animation.FuncAnimation(fig, animate, frames=len(x1), interval=75)
         plt.show()
- 
-        # Velocity plot
-        fig = plt.figure(figsize=(12,8))
-        plt.plot(velocities)
-        plt.xlabel('mpc step')
-        plt.ylabel('v [rad/s]')
-        plt.title('Velocity')
-        plt.show()
-    
+        ani.save('Newgif.gif', writer='pillow')
+

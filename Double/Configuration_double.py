@@ -1,13 +1,19 @@
 import numpy as np
-np.set_printoptions(precision=3, linewidth=200, suppress=True)
-LINE_WIDTH = 60
+from random import uniform
 
 
 ## ==> Time definition 
-T    = 0.2
+T    = 0.5
 dt   = 0.01
 N    = int(T/dt)    
-iter = 1000     
+iter = 5000    
+
+## ==> Random
+rnd_augment   = 0
+n_rnd         = 295
+# Reducing the velcoity bound according to the single pendulumn viabile set
+# In order to increase the possibility to found viable points
+rnd_vel = 10
 
 
 ## ==> Bounds and weights for both  
@@ -19,22 +25,24 @@ w_q1 = 1e3
 w_q2 = 1e3
 
 lowerVelocityLimit1 = -10
-upperVelocityLimit1 = 10
+upperVelocityLimit1 =  10
 lowerVelocityLimit2 = -10
-upperVelocityLimit2 = 10
+upperVelocityLimit2 =  10
 w_v1 = 1e-3
-w_v2 = 1e-3
+w_v2 = 1e-3 
 
-lowerControlBound1 = -9.81
-upperControlBound1 = 9.81
-lowerControlBound2 = -9.81
-upperControlBound2 = 9.81
-w_u2 = 1e-3
+# Double seems to be enough
+lowerControlBound1 = -9.81*5
+upperControlBound1 =  9.81*5
+lowerControlBound2 = -9.81*4
+upperControlBound2 =  9.81*4
 w_u1 = 1e-3
+w_u2 = 1e-3
 
 # Target postion 
-q1_target = 3/4*np.pi
-q2_target = 5/4*np.pi
+q1_target = np.pi
+q2_target = np.pi
+
 
 # Multiprocess
 processor = 4
@@ -44,25 +52,19 @@ ns = 4
 nu = 2
 
 
-
-############# TILL HERE check 
 # ======= NN
 train_size = 0.8    # Ratio of dataset in train set
 epochs     = 300    # Total epoches 
-patience   = 10     # Epochs to wait before early_stop
-L_rate     = 0.001  # Learing rate, default value for both Adam && Nadam
+patience   = 15     # Epochs to wait before early_stop
+L_rate     = 0.0005 # Learing rate, default value for both Adam && Nadam
 
 
 
 # ======= MCP
-TC_on         = 1     # flag for terminal constrains
-initial_state = np.array([np.pi, 1, np.pi, 0])   
+TC_on         = 1    # flag for terminal constrains
+TC_limit      = 0.5
+initial_state = np.array([5/4*np.pi, -1.0, np.pi, 0.0])    
 mpc_step      = 200             
-
-## ==> Noise (To use?)
-noise = 0
-mean = 0.001
-std = 0.001
 
 
 # ====== DEF
@@ -80,7 +82,6 @@ def grid(pos1, vel1 ,pos2, vel2):    # as input the grid wanted dimension
     state_array = np.column_stack((grid[0].flatten(), grid[1].flatten(), grid[2].flatten(), grid[3].flatten()))
     return state_array, n_ics
 
-    
 # Print time
 def print_time(start, end):  # as input the timestamp in UNIX
     diff   = end - start
@@ -88,3 +89,15 @@ def print_time(start, end):  # as input the timestamp in UNIX
     m, sec = divmod(r, 60)
     
     print(f'Computation time: {h}h  {m}min  {int(sec)}s')
+
+# Random sample 
+def random(n_ics):
+    state_array = np.zeros((n_ics,ns))
+    for i in range(n_ics):
+        state_array[i][0] = uniform(lowerPositionLimit1, upperPositionLimit1)
+        state_array[i][1] = uniform(-rnd_vel, rnd_vel)
+        state_array[i][2] = uniform(lowerPositionLimit2, upperPositionLimit2)
+        state_array[i][3] = uniform(-rnd_vel, rnd_vel)
+    
+    return state_array     
+

@@ -5,6 +5,12 @@ data_single.csv
 main.py
 prova.py
 
+
+
+# Tutti i file pkl escluso model 
+#*.pkl
+#!model.pkl
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,66 +1,63 @@
-############
-# MPC only with Sigmoid
-
-
 import numpy as np
 import casadi as cas
 import matplotlib.pyplot as plt
 import Configuration as conf
 import Dynamics 
 import joblib
+import time
 from NN import model_creation 
+from matplotlib import animation
 
-## ==> NB before run set the PLOT flag in NN is set  =0 
+# Set print options
+np.set_printoptions(precision=3, linewidth=200, suppress=True)
+
+## ==> NB before run this code set all flags in NN =0 
 PLOT = 0
+Animation = 0
 
 class MpcSinglePendulum:
     def __init__(self):
-        # Time && Weights
+        # Time 
         self.T   = conf.T                   
-        self.dt  = conf.dt               
+        self.dt  = conf.dt  
+        # Weights             
         self.w_q = conf.w_q                 
         self.w_u = conf.w_u                 
         self.w_v = conf.w_v         
                 
-        # NN
+        # Creation of NN with the computed weights
         self.model   = model_creation(conf.ns)        
-        self.model.load_weights("single_w.weights.h5")
+        self.model.load_weights("w100.weights.h5")
         self.weights = self.model.get_weights()
         
         # Scaler 
-        self.scaler  = joblib.load('scaler_single.pkl')
-        self.sc_mean = self.scaler.mean_
+        self.scaler   = joblib.load('scaler100.pkl')
+        self.sc_mean  = self.scaler.mean_
         self.sc_scale = self.scaler.scale_
 
 
-    ## ==> NN from TensorFlow to casADi 
+    ## ==> TENSORFLOW TO CASADI
     def NN_with_sigmoid(self, params, x):
-        out = cas.MX(x)  # Ensure `x` is a CasADi MX object
+        out = cas.MX(x)  
         iteration = 0
-    
         for param in params:
-            param = cas.MX(np.array(param.tolist()))  # Convert to CasADi MX object
-    
+            param = cas.MX(np.array(param.tolist()))   
             if iteration % 2 == 0:
-                out = param.T @ out  # Matrix multiplication
+                out = param.T @ out               # Linear layer  
             else:
-                out = param + out  # Addition
+                out = param + out                 # Add bias
                 if iteration < len(params) - 1:
-                    out = cas.fmax(0., out)  # Apply ReLU for hidden layers
+                    out = cas.fmax(0., out)       # ReLU 
     
             iteration += 1
-    
-        # Apply sigmoid activation function only on the final layer
-        out = 1 / (1 + cas.exp(-out))
-        
+        out = 1 / (1 + cas.exp(-out))             # Sigmoid 
         return out
 
 
-
-
-    
     def solve(self, x_init, N, X_guess = None, U_guess = None): 
         self.opti = cas.Opti()
+        
+        # Casadi variables
         self.q    = self.opti.variable(N)       
         self.v    = self.opti.variable(N)
         self.u    = self.opti.variable(N-1)
@@ -84,30 +81,27 @@ class MpcSinglePendulum:
                 
              
         
-        ## ==> Running cost 
+        ## ==> COST FUNCTION  
         self.cost = 0
         self.running_costs = [None,]*(N)      
         for i in range(N):
-            self.running_costs[i] =  self.w_q * (q[i] - conf.q_target)**2       # Position 
-            self.running_costs[i] += self.w_v * v[i]**2                         # Velocity
-            if (i<N-1):            
-                self.running_costs[i] += self.w_u * u[i]**2                     # Input 
+            self.running_costs[i] =  self.w_q * (q[i] - conf.q_target)**2  
+            self.running_costs[i] += self.w_v * v[i]**2                    
+            if (i<N-1):       
+                self.running_costs[i] += self.w_u * u[i]**2                 
             self.cost += self.running_costs[i]
         self.opti.minimize(self.cost)     
 
-
-        ## ==> Terminal cost 
-        state      = [q[N-1], v[N-1]]
-        state_norm = (state - self.sc_mean) / self.sc_scale 
+        ## ==> CONSTRAINS
+        # Terminal constrains using the NN 
+        state      = [q[N-1], v[N-1]] 
+        state_norm = (state - self.sc_mean) / self.sc_scale  # Manual application of scaling on the final state
         state_norm = [state_norm[0], state_norm[1]] 
-        state_mx   = cas.vertcat(*state_norm)
-        
+        state_nn   = cas.vertcat(*state_norm)                # transormation in casADi format  
         if conf.TC_on:
-            nn_output = self.NN_with_sigmoid(self.weights, state_mx)
-            self.opti.subject_to(nn_output > (1 - 5e-5))
-
-
-        ## ==> Constrains
+            nn_output = self.NN_with_sigmoid(self.weights, state_nn)
+            self.opti.subject_to(nn_output >= conf.TC_limit)
+        
         # Initial state 
         self.opti.subject_to(q[0] == x_init[0])
         self.opti.subject_to(v[0] == x_init[1])
@@ -126,10 +120,9 @@ class MpcSinglePendulum:
                 self.opti.subject_to(self.opti.bounded(conf.lowerControlBound, u[i], conf.upperControlBound))
                
         
-        ## ==> Chosing solver
+        ## ==> SOLVER
         opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
         s_opst = {"max_iter": int(conf.iter), 'tol' : 1e-3}
-        #p_opts = {"expand": True}
         self.opti.solver("ipopt", opts, s_opst)
         return self.opti.solve()
 
@@ -138,28 +131,29 @@ class MpcSinglePendulum:
 
 if __name__ == "__main__":
 
-    # Instance of OCP solver
+    # MPC problem
     mpc = MpcSinglePendulum()
     
-    # Empty list 
-    actual_trajectory = []                    
-    actual_inputs     = []   
-    
-    # Inital state append       
+    # Array of actual trajectory, starting from I.C
+    actual_trajectory, actual_inputs = [], []
     actual_trajectory.append(conf.initial_state)
          
-    # Initial Guess 
-    new_state_guess = np.zeros((conf.N,2))
-    new_input_guess = np.zeros(((conf.N)-1))
-    
-    # Update the state and input guesses for the next MPC iteration
-    for i in range(conf.mpc_step):      
+    start = time.time()
+    # MPC iteration 
+    for i in range(conf.mpc_step):       
         new_init_state = actual_trajectory[i]
         try:
-            if (i == 0): 
+            # First step, without any guess
+            if (i == 0):  
                 sol =  mpc.solve(new_init_state, conf.N) 
+                # Define the guess array 
+                new_state_guess = np.zeros((conf.N,conf.ns))
+                new_input_guess = np.zeros(((conf.N)-1))
+            
+            # With guess
             else:
                 sol = mpc.solve(new_init_state, conf.N ,new_state_guess, new_input_guess)
+        
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print(f'\n########################################')
@@ -170,41 +164,42 @@ if __name__ == "__main__":
             else:
                 print(f'Runtime error: {e}')
                 break
-                
+        
+        # Append first step 
         actual_trajectory.append(np.array([sol.value(mpc.q[1]), sol.value(mpc.v[1])]))
         actual_inputs.append(sol.value(mpc.u[0]))
 
-        # New guess
-        new_state_guess[:-1, 0] = sol.value(mpc.q[1:]).reshape(-1)
+        ## ==> NEW GUESS
+        # Copy in the guess array the obtained solutions, except for the first step 
+        new_state_guess[:-1, 0] = sol.value(mpc.q[1:]).reshape(-1) 
         new_state_guess[:-1, 1] = sol.value(mpc.v[1:]).reshape(-1)
         new_input_guess[:-1]    = sol.value(mpc.u[1:]).reshape(-1)
         
+        # The last guess's element is computed by means of the dynmaics  
         last_state = np.array([sol.value(mpc.q[-1]), sol.value(mpc.v[-1])])
         last_input = sol.value(mpc.u[-1])
         next_state = Dynamics.f_single(last_state, last_input) 
         
         new_state_guess[-1, 0] = next_state[0]
         new_state_guess[-1, 1] = next_state[1]  
-        new_input_guess[-1]    = last_input
+        new_input_guess[-1]    = last_input     # copy last input in the last postion 
         
         print(f'Step: {i+1} /  {conf.mpc_step}')
     
+    end = time.time()
     
+    conf.print_time(start, end)
     # Extract positions and velocities from the actual trajectory    
-    positions = []
-    velocities = []
-    for i in range(len(actual_trajectory)):
-        positions.append(actual_trajectory[i][0])
-        velocities.append(actual_trajectory[i][1])
+    positions  = [actual_trajectory[i][0] for i in range(len(actual_trajectory))] 
+    velocities = [actual_trajectory[i][1] for i in range(len(actual_trajectory))] 
+        
 
-
-
-    ## ==> Compute the viable set using the NN  
+    ## ==> PLOT MPC STEP 
+    # Compute viability kernel  
     dataset = conf.grid(100,100)[0]
-    Norm_dataset = mpc.scaler.fit_transform(dataset)
-    label_pred  = mpc.model.predict(Norm_dataset)
-    prediction  = np.round(label_pred).flatten()
-    
+    Norm_dataset     = mpc.scaler.fit_transform(dataset)
+    label_pred       = mpc.model.predict(Norm_dataset)
+    prediction       = np.round(label_pred).flatten()
     viable_states    = dataset[prediction == 1.0]
     no_viable_states = dataset[prediction == 0.0]  
     viable_states    = np.array(viable_states)
@@ -215,7 +210,6 @@ if __name__ == "__main__":
     if len(viable_states) != 0:
         ax.scatter(viable_states[:,0], viable_states[:,1], c='c', label='viable')
         ax.legend()
-
     if len(no_viable_states) != 0:
         ax.scatter(no_viable_states[:,0], no_viable_states[:,1], c='m', label='non-viable')
         ax.legend()
@@ -225,28 +219,59 @@ if __name__ == "__main__":
     ax.set_ylabel('dq [rad/s]')
     plt.show()
 
-    # Torque plot
+    
     if (PLOT == 1):
+        # Torque plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(actual_inputs)
-        plt.xlabel('mpc step')
+        plt.plot(actual_inputs, lw=3, c='darkgreen')
+        plt.xlabel('MPC step')
         plt.ylabel('u [N/m]')
         plt.title('Torque')
-        plt.show()
 
         # Position plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(positions)
-        plt.xlabel('mpc step')
+        plt.plot(positions, lw=3, c='darkgreen')
+        plt.xlabel('MPC step')
         plt.ylabel('q [rad]')
         plt.title('Position')
-        plt.show()
+
  
         # Velocity plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(velocities)
-        plt.xlabel('mpc step')
+        plt.plot(velocities, lw=3, c='darkgreen')
+        plt.xlabel('MPC step')
         plt.ylabel('v [rad/s]')
         plt.title('Velocity')
+
+
+    if (Animation == 1):
+        # Cartesian coordinate 
+        def get_x1y1(the1, L1):
+            return (L1 * np.sin(the1),
+                    -L1 * np.cos(the1))
+            
+        q = [arr[0] for arr in actual_trajectory]
+        x1, y1 = get_x1y1(q, 1)
+        
+        # Animation
+        def animate(i):
+            ln1.set_data([0, x1[i]], [0, y1[i]])
+        
+        fig, ax = plt.subplots(1, 1)
+        ax.set_facecolor('k')
+        ax.get_xaxis().set_ticks([])  
+        ax.get_yaxis().set_ticks([])  
+        ln1, = ax.plot([], [], 'rh-', lw=5, markersize=12)
+        ax.set_ylim(-0.5, 1.5)
+        ax.set_xlim(-1.5, 1.5)
+        
+        # Lines
+        ax.plot([0,  np.sin(conf.lowerPositionLimit)], [0, -np.cos(conf.lowerPositionLimit)], 'w-', lw=2)
+        ax.plot([0,  np.sin(conf.upperPositionLimit)], [0, -np.cos(conf.upperPositionLimit)], 'w-', lw=2)
+        ax.plot([0,0], [0,1], 'c--', lw=1)
+
+        # Animation
+        ani = animation.FuncAnimation(fig, animate, frames=len(x1), interval=50)
         plt.show()
+        #ani.save('MPC_noTC.gif', writer='pillow')
     

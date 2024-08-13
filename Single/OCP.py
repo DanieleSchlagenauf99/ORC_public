@@ -1,13 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import casadi as cas
-import Dynamics
-import multiprocessing
 import Configuration as conf
+import Dynamics as dyn
 
+import multiprocessing
 import time
 
-
+# Set print options
+np.set_printoptions(precision=3, linewidth=200, suppress=True)
 
 class OcpSinglePendulum:
     def __init__(self):
@@ -30,7 +31,7 @@ class OcpSinglePendulum:
         v = self.v
         u = self.u
         
-        # Initialization 
+        # Initialization: x = [q, v] && u  
         if (X_guess is not None):                           # State
             for i in range(N):
                 self.opti.set_initial(q[i], X_guess[i,0])
@@ -45,18 +46,17 @@ class OcpSinglePendulum:
                 self.opti.set_initial(u[i], U_guess[i,:])
         
         
-        ## ==> Cost function 
+        ## ==> COST FUNCTION 
         self.cost = 0
         self.running_costs = [None,]*(N)      
         for i in range(N):
-            #self.running_costs[i] =  self.w_q * (q[i] - conf.q_target)**2       # Position 
-            self.running_costs[i] = self.w_v * v[i]**2                         # Velocity
-            if (i<N-1):            
-                self.running_costs[i] += self.w_u * u[i]**2                     # Input 
+            self.running_costs[i] = self.w_v * v[i]**2                                   
+            if (i<N-1):         
+                self.running_costs[i] += self.w_u * u[i]**2                 
             self.cost += self.running_costs[i]
         self.opti.minimize(self.cost)
         
-        ## ==> Constrains
+        ## ==> CONSTRAINS
         # Initial state 
         self.opti.subject_to(q[0] == x_init[0])
         self.opti.subject_to(v[0] == x_init[1])
@@ -68,14 +68,14 @@ class OcpSinglePendulum:
             
             if (i<N-1):
                 # Dynamics
-                x_plus = Dynamics.f_single(np.array([q[i], v[i]]), u[i])
+                x_plus = dyn.f_single(np.array([q[i], v[i]]), u[i])
                 self.opti.subject_to(q[i+1] == x_plus[0])
                 self.opti.subject_to(v[i+1] == x_plus[1])
                 # Bounded Torque
                 self.opti.subject_to(self.opti.bounded(conf.lowerControlBound, u[i], conf.upperControlBound))
                
-        
-        ## ==> Chosing solver
+               
+        ## ==> SOLVER
         opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
         s_opst = {"max_iter": int(conf.iter)}
         self.opti.solver("ipopt", opts, s_opst)
@@ -91,62 +91,57 @@ if __name__ == "__main__":
     # OCP problem
     ocp = OcpSinglePendulum()
     
-    # Inital state grid
-    npos = 21
-    nvel = 21
+    # Grid definition
+    npos, nvel = 100, 100
     state_array, n_ics = conf.grid(npos, nvel)
     
     # State computation function
     def ocp_function_single_pendulum(index):
-        viable = []
-        no_viable = []
-        
+        viable, no_viable = [], []
+        k = 0                            # Actual step for single process
+        l = int(n_ics / conf.processor)  # Total number of step for single process
         for i in range(index[0], index[1]):
+            k = k+1
             x = state_array[i, :]
             try:
-                #sol = ocp.solve(x, conf.N)   sol will not be used!
-                ocp.solve(x, conf.N)
+                sol = ocp.solve(x, conf.N)
                 viable.append([x[0], x[1]])
-                print(f'Feasible initlai state: {x}')
+                print(f'Step: {k} / {l},  Feasible initial state found: {x}')
             except RuntimeError as e:                     
                 if "Infeasible_Problem_Detected" in str(e):
-                    print(f'Non Feasible initlai state: {x}')
+                    print(f'Step: {k} / {l},  Non feasible initial state found: {x}')
                     no_viable.append([x[0], x[1]])
                 else:
                     print(f'Runtime error: {e}')
         return viable, no_viable
     
     
-    ## ==> Multi process  
-    # state equal division 
+    ## ==> MULTIPROCESS  
+    # Split same number of operation in each processor 
     indexes = np.linspace(0, n_ics, num=conf.processor+1)
     args = []
     for i in range(conf.processor):
         args.append((int(indexes[i]), int(indexes[i+1])))
         
     # Pool logic application 
-    pool = multiprocessing.Pool(processes=conf.processor)
-    start = time.time()
-    results = pool.map(ocp_function_single_pendulum, args)
+    pool    = multiprocessing.Pool(processes=conf.processor)
+    start   = time.time()
+    results = pool.map(ocp_function_single_pendulum, args)  # first colum viable, second colum non viable 
     pool.close()
     pool.join()
-    end = time.time()
     
-    # Print duration 
+    # Print duration
+    end = time.time() 
     conf.print_time(start, end)
     
-    
-
-    # List state from each processor
-    viable_states    = [results[i][0] for i in range(conf.processor)]
+    # Join the result from each processor 
+    viable_states    = [results[i][0] for i in range(conf.processor)] 
     no_viable_states = [results[i][1] for i in range(conf.processor)]
-    
     viable_states    = np.concatenate(viable_states)
     no_viable_states = np.concatenate(no_viable_states)
 
 
-
-    ## ==> Plot state space
+    ## ==> PLOTS 
     fig = plt.figure(figsize=(12,8))
     ax = fig.add_subplot()
     if len(viable_states) != 0:
@@ -160,15 +155,16 @@ if __name__ == "__main__":
     plt.show()
 
 
-    ## ==> Dataset creation 
+    ## ==> DATASET CREATION 
+    # The dataset is created by concatenate all the state marking with 1 the viable and 0 the non viable 
     viable_states    = np.column_stack((viable_states, np.ones(len(viable_states), dtype=int)))
     no_viable_states = np.column_stack((no_viable_states, np.zeros(len(no_viable_states), dtype=int)))
     dataset          = np.concatenate((viable_states, no_viable_states))
 
-    # Save data in .csv 
+    # csv file 
     columns = ['q', 'v', 'viable']
-    with open('data_single.csv', 'w') as f:
-        f.write(','.join(columns) + '\n')
+    with open('data_100.csv', 'w') as f:
+        f.write(','.join(columns) + '\n')    # Columns header 
         np.savetxt(f, dataset, delimiter=',', fmt='%s')
 
 

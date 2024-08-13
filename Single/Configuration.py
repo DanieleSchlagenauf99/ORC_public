@@ -1,63 +1,54 @@
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-np.set_printoptions(precision=3, linewidth=200, suppress=True)
-LINE_WIDTH = 60
 
 
-## ==> Time definition 
-T    = 0.5
-dt   = 0.01
-N    = int(T/dt)
-iter = 1000    # Max number of iteration 
+T    = 0.5         # Time horizon
+dt   = 0.01        # Time step 
+N    = int(T/dt)   # Number of step
+iter = 1000        # Max number of iteration 
 
 
-## ==> Bounds from A2  
-#  Weights chosen to be tight on the position and lighter on velcoty and torque
+## ==> LIMITS (same of A2)  
+#  Weights are set higher for position while lower for velocity and actuation
 lowerPositionLimit = 3/4*np.pi
 upperPositionLimit = 5/4*np.pi
-w_q = 1e2
+w_q = 1e3
 
 lowerVelocityLimit = -10
 upperVelocityLimit = 10
-w_v = 1e-1
+w_v = 1e-3
 
 lowerControlBound = -9.81
 upperControlBound = 9.81
-w_u = 1e-4
+w_u = 1e-3
 
-# Target postion 
-q_target = 5/4 * np.pi
+
+## ==> OTHERS  
 # Multiprocess
+processor = 4
 
-processor = 3
 # Number of state and control 
 ns = 2
 nu = 1
 
 
-# ======= NN
+# ==> NN
 train_size = 0.8    # Ratio of dataset in train set
 epochs     = 300    # Total epoches 
-patience   = 10     # Epochs to wait before early_stop
-L_rate     = 0.001  # Learing rate, default value for both Adam && Nadam
+patience   = 10     # Epochs to wait before early stoping
+L_rate     = 0.001  # Learing rate (default value for Adam)
 
 
-
-# ======= MCP
-TC_on         =  1                     # flag for terminal constrains
-initial_state = np.array([np.pi, 1])   # I.C.
-mpc_step      = 100             
-
-## ==> Noise (To use?)
-noise = 0
-mean = 0.001
-std = 0.001
+# ==> MCP
+TC_on         = 1                        # flag for terminal constrains
+TC_limit      = 1 - 1e-5                 # Set close to 1 to enforce the viability. Conservative if closer (1e-7) 5e-6
+initial_state = np.array([np.pi, 2.5])  # I.C.
+mpc_step      = 200                    
+q_target      = 3/4*np.pi                # Target postion
 
 
-# ====== DEF
+# ==> FUNCTIONS
 # Grid sample of the state
-def grid(pos, vel):    # as input the grid wanted dimension
+def grid(pos, vel):    
     n_ics = pos * vel
     state_array = np.zeros((n_ics,(ns)))
     lin_p       = np.linspace(lowerPositionLimit, upperPositionLimit, num=pos)
