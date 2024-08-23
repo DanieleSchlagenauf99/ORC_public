@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
 
     ## ==> COMPUTATION OF THE VIABLE KERNEL USING THE NN  
-    data    = np.genfromtxt("data_100.csv", delimiter=",", skip_header=1)  
+    data    = np.genfromtxt("BIG_data.csv", delimiter=",", skip_header=1)  
     dataset = data[:, :-1] 
     label   = data[:, -1]
     Norm_dataset = scaler.fit_transform(dataset)

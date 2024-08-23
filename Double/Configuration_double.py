@@ -3,17 +3,18 @@ from random import uniform
 
 
 ## ==> Time definition 
-T    = 0.5
+T    = 0.25
 dt   = 0.01
 N    = int(T/dt)    
-iter = 5000    
+iter = 10000    
 
 ## ==> Random
-rnd_augment   = 0
-n_rnd         = 295
-# Reducing the velcoity bound according to the single pendulumn viabile set
-# In order to increase the possibility to found viable points
-rnd_vel = 10
+rnd_augment   = 1           # flag
+n_rnd         = 18000        # Number of points 
+rnd_vel = 10                # Rnd new velocity bound
+rnd_pos_lower = 3/4*np.pi   # Rnd new position bound
+rnd_pos_upper = 5/4*np.pi   # Rnd new position bound
+
 
 
 ## ==> Bounds and weights for both  
@@ -40,12 +41,12 @@ w_u1 = 1e-3
 w_u2 = 1e-3
 
 # Target postion 
-q1_target = np.pi
-q2_target = np.pi
+q1_target = 3/4*np.pi
+q2_target = 3/4*np.pi
 
 
 # Multiprocess
-processor = 4
+processor = 6
 
 # Number of state and control 
 ns = 4
@@ -61,10 +62,10 @@ L_rate     = 0.0005 # Learing rate, default value for both Adam && Nadam
 
 
 # ======= MCP
-TC_on         = 1    # flag for terminal constrains
+TC_on         = 0    # flag for terminal constrains
 TC_limit      = 0.5
-initial_state = np.array([5/4*np.pi, -1.0, np.pi, 0.0])    
-mpc_step      = 200             
+initial_state = np.array([5/4*np.pi, -0.0, 5/4*np.pi, -0.0])    
+mpc_step      = 100             
 
 
 # ====== DEF
@@ -94,9 +95,9 @@ def print_time(start, end):  # as input the timestamp in UNIX
 def random(n_ics):
     state_array = np.zeros((n_ics,ns))
     for i in range(n_ics):
-        state_array[i][0] = uniform(lowerPositionLimit1, upperPositionLimit1)
+        state_array[i][0] = uniform(rnd_pos_lower, rnd_pos_upper)
         state_array[i][1] = uniform(-rnd_vel, rnd_vel)
-        state_array[i][2] = uniform(lowerPositionLimit2, upperPositionLimit2)
+        state_array[i][2] = uniform(rnd_pos_lower, rnd_pos_upper)
         state_array[i][3] = uniform(-rnd_vel, rnd_vel)
     
     return state_array     

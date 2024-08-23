@@ -14,7 +14,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 # Set print options
 np.set_printoptions(precision=3, linewidth=200, suppress=True)
 
-TEST = 0    # Plot flag: disable to run MPC
+TEST = 1    # Plot flag: disable to run MPC
 
 ## ==> NN MODEL
 def model_creation(nx):   # as input the features's dimension
@@ -37,7 +37,7 @@ def model_creation(nx):   # as input the features's dimension
 
 if __name__ == "__main__":
     # Import data 
-    data_path = "data_54.csv"
+    data_path = "p54T25.csv"
     data      = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
     dataset   = data[:, :-1] 
     labels    = data[:, -1]
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     train_data = scaler.fit_transform(train_data)
     test_data  = scaler.transform(test_data)
     # Save scaler data 
-    joblib.dump(scaler, 'scaler54.pkl')
+    joblib.dump(scaler, 'scaler54T.pkl')
 
     model = model_creation(nx=conf.ns)   
     model.summary()
@@ -74,12 +74,12 @@ if __name__ == "__main__":
     print('\n')
     
     ## ==> SAVE WEIGHTS  
-    model.save_weights("w54.weights.h5", overwrite = True)
+    model.save_weights("w54T.weights.h5", overwrite = True)
     
 
 if(TEST):
     
-    data    = np.genfromtxt("test54.csv", delimiter=",", skip_header=1)  
+    data    = np.genfromtxt("test54T.csv", delimiter=",", skip_header=1)  
     dataset = data[:, :-1] 
     label   = data[:, -1]
     Norm_dataset = scaler.fit_transform(dataset)

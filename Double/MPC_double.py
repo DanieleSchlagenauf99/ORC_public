@@ -30,11 +30,11 @@ class MpcDoublePendulum:
                 
         # Creation of NN with the computed weights
         self.model   = model_creation(conf.ns)        
-        self.model.load_weights("w11.weights.h5")
+        self.model.load_weights("w54.weights.h5")
         self.weights = self.model.get_weights()
         
         # Scaler    
-        self.scaler = joblib.load('scaler11.pkl')
+        self.scaler = joblib.load('scaler54.pkl')
         self.sc_mean = self.scaler.mean_
         self.sc_scale = self.scaler.scale_
     

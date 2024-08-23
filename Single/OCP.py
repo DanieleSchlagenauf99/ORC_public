@@ -92,7 +92,7 @@ if __name__ == "__main__":
     ocp = OcpSinglePendulum()
     
     # Grid definition
-    npos, nvel = 100, 100
+    npos, nvel = 20, 20
     state_array, n_ics = conf.grid(npos, nvel)
     
     # State computation function
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     # csv file 
     columns = ['q', 'v', 'viable']
-    with open('data_100.csv', 'w') as f:
+    with open('aa5.csv', 'w') as f:
         f.write(','.join(columns) + '\n')    # Columns header 
         np.savetxt(f, dataset, delimiter=',', fmt='%s')
 
