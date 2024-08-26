@@ -24,7 +24,7 @@ w_u = 1e-3
 
 ## ==> OTHERS  
 # Multiprocess
-processor = 4
+processor = 1
 
 # Number of state and control 
 ns = 2
@@ -39,9 +39,9 @@ L_rate     = 0.001  # Learing rate (default value for Adam)
 
 
 # ==> MCP
-TC_on         = 1                        # flag for terminal constrains
-TC_limit      = 1 - 1e-5                 # Set close to 1 to enforce the viability. Conservative if closer (1e-7) 5e-6
-initial_state = np.array([np.pi, 2.5])  # I.C.
+TC_on         = 1                       # flag for terminal constrains
+TC_limit      = 1 - 5e-5                # Set close to 1 to enforce the viability. Conservative if closer (1e-7) 5e-6
+initial_state = np.array([np.pi, 2.5])  # IC
 mpc_step      = 200                    
 q_target      = 3/4*np.pi                # Target postion
 

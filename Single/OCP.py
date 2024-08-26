@@ -76,7 +76,7 @@ class OcpSinglePendulum:
                
                
         ## ==> SOLVER
-        opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
+        opts   = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
         s_opst = {"max_iter": int(conf.iter)}
         self.opti.solver("ipopt", opts, s_opst)
         
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     ocp = OcpSinglePendulum()
     
     # Grid definition
-    npos, nvel = 20, 20
+    npos, nvel = 100, 100
     state_array, n_ics = conf.grid(npos, nvel)
     
     # State computation function
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     # csv file 
     columns = ['q', 'v', 'viable']
-    with open('aa5.csv', 'w') as f:
+    with open('data_100.csv', 'w') as f:
         f.write(','.join(columns) + '\n')    # Columns header 
         np.savetxt(f, dataset, delimiter=',', fmt='%s')
 

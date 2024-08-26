@@ -14,7 +14,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 # Set print options
 np.set_printoptions(precision=3, linewidth=200, suppress=True)
 
-TEST = 1    # Plot flag: disable to run MPC
+TEST = 0    # Plot flag: disable to run MPC
 
 ## ==> NN MODEL
 def model_creation(nx):   # as input the features's dimension
@@ -76,7 +76,8 @@ if __name__ == "__main__":
     ## ==> SAVE WEIGHTS  
     model.save_weights("w54T.weights.h5", overwrite = True)
     
-
+    
+## ==> NN EVALUATION 
 if(TEST):
     
     data    = np.genfromtxt("test54T.csv", delimiter=",", skip_header=1)  
@@ -91,8 +92,8 @@ if(TEST):
         
     # Plots 
     # Confusion matrix    
-    cm = confusion_matrix(label, prediction)
-    fig, ax = plt.subplots(figsize=(8, 6))
+    cm         = confusion_matrix(label, prediction)
+    fig, ax    = plt.subplots(figsize=(8, 6))
     cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Non-Viable", "Viable"])
     cm_display.plot(ax=ax, cmap='BuGn')
     plt.ylabel('True')

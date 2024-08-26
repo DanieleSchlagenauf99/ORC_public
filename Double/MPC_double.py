@@ -5,6 +5,7 @@ import Configuration_double as conf
 import Dynamics_double as dyn
 import joblib
 import time
+
 from NN_double import model_creation  
 from matplotlib import animation
 
@@ -30,12 +31,12 @@ class MpcDoublePendulum:
                 
         # Creation of NN with the computed weights
         self.model   = model_creation(conf.ns)        
-        self.model.load_weights("w54.weights.h5")
+        self.model.load_weights("w54T.weights.h5")
         self.weights = self.model.get_weights()
         
         # Scaler    
-        self.scaler = joblib.load('scaler54.pkl')
-        self.sc_mean = self.scaler.mean_
+        self.scaler   = joblib.load('scaler54T.pkl')
+        self.sc_mean  = self.scaler.mean_
         self.sc_scale = self.scaler.scale_
     
 
@@ -59,6 +60,8 @@ class MpcDoublePendulum:
     
     def solve(self, x_init, N, X_guess = None, U_guess = None): 
         self.opti = cas.Opti()
+        
+        # Casadi variables
         self.q1 = self.opti.variable(N)       
         self.v1 = self.opti.variable(N)
         self.u1 = self.opti.variable(N-1)
@@ -111,9 +114,9 @@ class MpcDoublePendulum:
         ## ==> CONSTRAINS
         # Terminal constrains using the NN
         state = [q1[N-1], v1[N-1],q2[N-1], v2[N-1]]
-        state_norm = (state - self.sc_mean) / self.sc_scale
+        state_norm = (state - self.sc_mean) / self.sc_scale                         # Manual application of scaling on the final state
         state_norm = [state_norm[0], state_norm[1], state_norm[2], state_norm[3]] 
-        state_mx   = cas.vertcat(*state_norm)
+        state_mx   = cas.vertcat(*state_norm)                                       # Transormation in casADi format  
         
         if conf.TC_on:
             nn_output = self.NN_with_sigmoid(self.weights, state_mx)
@@ -240,13 +243,14 @@ if __name__ == "__main__":
         plt.legend()  
         plt.show()
         
-        # Pendulum plot
+        # First pendulum plot
         plt.figure(2)
         plt.plot(positions1, velocities1, c='red')
         plt.xlabel('q1 [rad]')
         plt.ylabel('v1 [rad/s]')
         plt.title('First pendulum')
         
+        # Second pendulum plot
         plt.figure(3)
         plt.plot(positions2, velocities2, c='green')
         plt.xlabel('q2 [rad]')
@@ -257,7 +261,7 @@ if __name__ == "__main__":
         
         
     if (Animation == 1):
-        # Cartesian coordinate 
+        # Cartesian coordinate,both the1 and the2 has the same zero reference 
         def get_x1y1x2y2(the1, the2, L1, L2):
             return (L1 * np.sin(the1),
                     -L1 * np.cos(the1),
@@ -269,6 +273,7 @@ if __name__ == "__main__":
         q2 = [arr[2] for arr in actual_trajectory]
         x1, y1, x2, y2 = get_x1y1x2y2(q1, q2, 1, 1)
 
+        # Animation
         def animate(i):
             ln1.set_data([0, x1[i]], [0, y1[i]])
             ln2.set_data([x1[i], x2[i]], [y1[i], y2[i]])
@@ -285,26 +290,29 @@ if __name__ == "__main__":
 
         fig, ax = plt.subplots(1, 1)
         ax.set_facecolor('k')
-        ax.get_xaxis().set_ticks([])  # enable this to hide x axis ticks
-        ax.get_yaxis().set_ticks([])  # enable this to hide y axis ticks
+        ax.get_xaxis().set_ticks([])  
+        ax.get_yaxis().set_ticks([])  
         ln1, = ax.plot([], [], 'rh-', lw=5, markersize=12)
         ln2, = ax.plot([], [], 'gh-', lw=5, markersize=12)
         ax.set_ylim(-2.5, 2.5)
         ax.set_xlim(-2.5, 2.5)
 
 
-        # Cono per il primo pendolo
+        # First limit cone plot
         ax.plot([0, np.sin(conf.lowerPositionLimit1)], [0, -np.cos(conf.lowerPositionLimit1)], 'w-', lw=2)
         ax.plot([0, np.sin(conf.upperPositionLimit1)], [0, -np.cos(conf.upperPositionLimit1)], 'w-', lw=2)
         ax.plot([0, 0], [0, 1], 'c--', lw=1)
 
-        # Cono per il secondo pendolo (inizialmente vuoto, sarà aggiornato dall'animazione)
+        # Second limit cone plot (empty then filled at each iter)
         cone2_1, = ax.plot([], [], 'w-', lw=2)
         cone2_2, = ax.plot([], [], 'w-', lw=2)
         cone2_3, = ax.plot([], [], 'c--', lw=1)
         
+        # Write number of step 
         step_text = ax.text(0.05, 0.9, '', transform=ax.transAxes, color='white', fontsize=15)
-        ani = animation.FuncAnimation(fig, animate, frames=len(x1), interval=75)
+        
+        # Animation
+        ani = animation.FuncAnimation(fig, animate, frames=len(x1), interval=50)
         plt.show()
-        ani.save('Newgif.gif', writer='pillow')
+        #ani.save('Newgif.gif', writer='pillow')
 

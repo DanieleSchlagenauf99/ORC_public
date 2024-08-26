@@ -107,8 +107,8 @@ if __name__ == "__main__":
 ## ==> NN EVALUATION 
 if(TEST):
     # Confusion matrix    
-    cm = confusion_matrix(label, prediction)
-    fig, ax = plt.subplots(figsize=(8, 6))
+    cm         = confusion_matrix(label, prediction)
+    fig, ax    = plt.subplots(figsize=(8, 6))
     cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Non-Viable", "Viable"])
     cm_display.plot(ax=ax, cmap='BuGn')
     plt.ylabel('True')

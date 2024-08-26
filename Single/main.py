@@ -4,16 +4,12 @@ import matplotlib.pyplot as plt
 import Configuration as conf
 import Dynamics 
 import joblib
-import time
 
 from NN import model_creation 
 from matplotlib import animation
 
-# Set print options
-np.set_printoptions(precision=3, linewidth=200, suppress=True)
-
 ## ==> NB before run this code set all flags in NN =0 
-PLOT = 1
+PLOT = 0
 Animation = 0
 
 class MpcSinglePendulum:
@@ -28,11 +24,11 @@ class MpcSinglePendulum:
                 
         # Creation of NN with the computed weights
         self.model   = model_creation(conf.ns)        
-        self.model.load_weights("w100.weights.h5")
+        self.model.load_weights("relu.weights.h5")
         self.weights = self.model.get_weights()
         
         # Scaler 
-        self.scaler   = joblib.load('scaler100.pkl')
+        self.scaler   = joblib.load('scalerRelu.pkl')
         self.sc_mean  = self.scaler.mean_
         self.sc_scale = self.scaler.scale_
 
@@ -47,11 +43,11 @@ class MpcSinglePendulum:
                 out = param.T @ out               # Linear layer  
             else:
                 out = param + out                 # Add bias
-                if iteration < len(params) - 1:
-                    out = cas.fmax(0., out)       # ReLU 
+                #if iteration < len(params) - 1:
+                out = cas.fmax(0., out)       # ReLU 
     
             iteration += 1
-        out = 1 / (1 + cas.exp(-out))             # Sigmoid 
+        #out = 1 / (1 + cas.exp(-out))             # Sigmoid 
         return out
 
 
@@ -98,10 +94,10 @@ class MpcSinglePendulum:
         state      = [q[N-1], v[N-1]] 
         state_norm = (state - self.sc_mean) / self.sc_scale  # Manual application of scaling on the final state
         state_norm = [state_norm[0], state_norm[1]] 
-        state_mx   = cas.vertcat(*state_norm)                # Transormation in casADi format  
+        state_nn   = cas.vertcat(*state_norm)                # transormation in casADi format  
         if conf.TC_on:
-            nn_output = self.NN_with_sigmoid(self.weights, state_mx)
-            self.opti.subject_to(nn_output >= conf.TC_limit)
+            nn_output = self.NN_with_sigmoid(self.weights, state_nn)
+            self.opti.subject_to(nn_output > 3)
         
         # Initial state 
         self.opti.subject_to(q[0] == x_init[0])
@@ -139,9 +135,8 @@ if __name__ == "__main__":
     actual_trajectory, actual_inputs = [], []
     actual_trajectory.append(conf.initial_state)
          
-    start = time.time()
     # MPC iteration 
-    for i in range(conf.mpc_step):       
+    for i in range(conf.mpc_step):      
         new_init_state = actual_trajectory[i]
         try:
             # First step, without any guess
@@ -150,11 +145,9 @@ if __name__ == "__main__":
                 # Define the guess array 
                 new_state_guess = np.zeros((conf.N,conf.ns))
                 new_input_guess = np.zeros(((conf.N)-1))
-            
             # With guess
             else:
                 sol = mpc.solve(new_init_state, conf.N ,new_state_guess, new_input_guess)
-        
         except RuntimeError as e:
             if "Infeasible_Problem_Detected" in str(e):
                 print(f'\n########################################')
@@ -187,9 +180,7 @@ if __name__ == "__main__":
         
         print(f'Step: {i+1} /  {conf.mpc_step}')
     
-    end = time.time()
-    
-    conf.print_time(start, end)
+ 
     # Extract positions and velocities from the actual trajectory    
     positions  = [actual_trajectory[i][0] for i in range(len(actual_trajectory))] 
     velocities = [actual_trajectory[i][1] for i in range(len(actual_trajectory))] 
@@ -201,7 +192,7 @@ if __name__ == "__main__":
     Norm_dataset     = mpc.scaler.fit_transform(dataset)
     label_pred       = mpc.model.predict(Norm_dataset)
     prediction       = np.round(label_pred).flatten()
-    viable_states    = dataset[prediction == 1.0]
+    viable_states    = dataset[prediction >= 1.0]
     no_viable_states = dataset[prediction == 0.0]  
     viable_states    = np.array(viable_states)
     no_viable_states = np.array(no_viable_states)
@@ -224,26 +215,27 @@ if __name__ == "__main__":
     if (PLOT == 1):
         # Torque plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(actual_inputs, lw=3, c='darkgreen')
-        plt.xlabel('MPC step')
+        plt.plot(actual_inputs)
+        plt.xlabel('mpc step')
         plt.ylabel('u [N/m]')
         plt.title('Torque')
+        plt.show()
 
         # Position plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(positions, lw=3, c='darkgreen')
-        plt.xlabel('MPC step')
+        plt.plot(positions)
+        plt.xlabel('mpc step')
         plt.ylabel('q [rad]')
         plt.title('Position')
-
+        plt.show()
  
         # Velocity plot
         fig = plt.figure(figsize=(12,8))
-        plt.plot(velocities, lw=3, c='darkgreen')
-        plt.xlabel('MPC step')
+        plt.plot(velocities)
+        plt.xlabel('mpc step')
         plt.ylabel('v [rad/s]')
         plt.title('Velocity')
-
+        plt.show()
 
     if (Animation == 1):
         # Cartesian coordinate 
@@ -257,7 +249,6 @@ if __name__ == "__main__":
         # Animation
         def animate(i):
             ln1.set_data([0, x1[i]], [0, y1[i]])
-            step_text.set_text(f'mcp_step: {i+1}')
         
         fig, ax = plt.subplots(1, 1)
         ax.set_facecolor('k')
@@ -267,16 +258,13 @@ if __name__ == "__main__":
         ax.set_ylim(-0.5, 1.5)
         ax.set_xlim(-1.5, 1.5)
         
-        # Limit cone
+        # Lines
         ax.plot([0,  np.sin(conf.lowerPositionLimit)], [0, -np.cos(conf.lowerPositionLimit)], 'w-', lw=2)
         ax.plot([0,  np.sin(conf.upperPositionLimit)], [0, -np.cos(conf.upperPositionLimit)], 'w-', lw=2)
         ax.plot([0,0], [0,1], 'c--', lw=1)
 
-        # Write number of step 
-        step_text = ax.text(0.05, 0.9, '', transform=ax.transAxes, color='white', fontsize=15)
-        
         # Animation
         ani = animation.FuncAnimation(fig, animate, frames=len(x1), interval=50)
         plt.show()
-        ani.save('Newgif.gif', writer='pillow')
+        #ani.save('pend.gif', writer='pillow')
     
