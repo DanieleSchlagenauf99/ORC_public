@@ -37,7 +37,7 @@ def model_creation(nx):   # as input the features's dimension
 
 if __name__ == "__main__":
     # Import data 
-    data_path = "p54T25.csv"
+    data_path = "data_54T.csv"
     data      = np.genfromtxt(data_path, delimiter=",", skip_header=1)  
     dataset   = data[:, :-1] 
     labels    = data[:, -1]
