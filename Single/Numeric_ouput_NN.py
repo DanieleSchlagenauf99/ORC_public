@@ -31,8 +31,7 @@ def NN_with_sigmoid(params, x):
     return out
 
 ## ==> STATE DEFINITION 
-state = [3.14, 0]
-#state = [3/4*np.pi, 0.0]
+state = [3/4*np.pi, 0.0]
 state_norm = (np.array(state) - sc_mean) / sc_scale
 
 # Numeric value

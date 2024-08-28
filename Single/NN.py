@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # Creation of the set
     train_data, test_data, train_label, test_label = train_test_split(dataset,labels, train_size=conf.train_size, random_state=31)
     
-    # scaling
+    # Scaling
     train_data = scaler.fit_transform(train_data)
     test_data  = scaler.transform(test_data)
     # Save scaler data 

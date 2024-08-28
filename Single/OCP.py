@@ -82,9 +82,26 @@ class OcpSinglePendulum:
         
         return self.opti.solve()
     
- 
-
-
+    
+# State computation function
+def ocp_function_single_pendulum(index):
+    viable, no_viable = [], []
+    k = 0                            # Actual step for single process
+    l = int(n_ics / conf.processor)  # Total number of step for single process
+    for i in range(index[0], index[1]):
+        k = k+1
+        x = state_array[i, :]
+        try:
+            sol = ocp.solve(x, conf.N)
+            viable.append([x[0], x[1]])
+            print(f'Step: {k} / {l},  Feasible initial state found: {x}')
+        except RuntimeError as e:                     
+            if "Infeasible_Problem_Detected" in str(e):
+                print(f'Step: {k} / {l},  Non feasible initial state found: {x}')
+                no_viable.append([x[0], x[1]])
+            else:
+                print(f'Runtime error: {e}')
+    return viable, no_viable
 
 if __name__ == "__main__":
 
@@ -94,28 +111,8 @@ if __name__ == "__main__":
     # Grid definition
     npos, nvel = 100, 100
     state_array, n_ics = conf.grid(npos, nvel)
-    
-    # State computation function
-    def ocp_function_single_pendulum(index):
-        viable, no_viable = [], []
-        k = 0                            # Actual step for single process
-        l = int(n_ics / conf.processor)  # Total number of step for single process
-        for i in range(index[0], index[1]):
-            k = k+1
-            x = state_array[i, :]
-            try:
-                sol = ocp.solve(x, conf.N)
-                viable.append([x[0], x[1]])
-                print(f'Step: {k} / {l},  Feasible initial state found: {x}')
-            except RuntimeError as e:                     
-                if "Infeasible_Problem_Detected" in str(e):
-                    print(f'Step: {k} / {l},  Non feasible initial state found: {x}')
-                    no_viable.append([x[0], x[1]])
-                else:
-                    print(f'Runtime error: {e}')
-        return viable, no_viable
-    
-    
+   
+   
     ## ==> MULTIPROCESS  
     # Split same number of operation in each processor 
     indexes = np.linspace(0, n_ics, num=conf.processor+1)

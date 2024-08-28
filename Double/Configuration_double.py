@@ -1,7 +1,7 @@
 import numpy as np
 from random import uniform
 
-T    = 0.25         # Time horizon
+T    = 0.25        # Time horizon
 dt   = 0.01        # Time step 
 N    = int(T/dt)   # Number of step
 iter = 1000        # Max number of iteration 
@@ -53,9 +53,9 @@ nu = 2
 
 
 # ==> NN
-train_size = 0.8    # Ratio of dataset in train set
-epochs     = 300    # Total epoches 
-patience   = 15     # Epochs to wait before early stoping
+train_size = 0.8     # Ratio of dataset in train set
+epochs     = 300     # Total epoches 
+patience   = 15      # Epochs to wait before early stoping
 L_rate     = 0.0005  # Learing rate 
 
 
@@ -63,9 +63,10 @@ L_rate     = 0.0005  # Learing rate
 TC_on         = 0                                             # flag for terminal constrains
 TC_limit      = 0.5                                           # Limits
 initial_state = np.array([5/4*np.pi, -0.0, 5/4*np.pi, -0.0])  # IC
-mpc_step      = 100             
-q1_target = 3/4*np.pi                                         # target postions 
-q2_target = 3/4*np.pi
+mpc_step      = 100     
+
+q1_target     = 3/4*np.pi                                         # target postions 
+q2_target     = 3/4*np.pi
 
 # ==> FUNCTIONS
 # Grid sample of the state

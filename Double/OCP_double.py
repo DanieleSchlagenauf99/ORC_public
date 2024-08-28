@@ -109,7 +109,26 @@ class OcpDoublePendulum:
         return self.opti.solve()
     
  
-
+# State computation function
+def ocp_function_double_pendulum(index):
+    viable,no_viable = [],[]
+    k = 0                            # Actual step for single process
+    l = int(n_ics / conf.processor)  # Total number of step for single process
+    # Select data 
+    for i in range(index[0], index[1]):
+        k = k + 1
+        x = state_array[i, :]
+        try:  
+            sol = ocp.solve(x, conf.N)
+            viable.append([x[0], x[1], x[2], x[3]])
+            print(f'Step: {k} / {l}, Feasible initial state found: {x}')
+        except RuntimeError as e:                     
+            if "Infeasible_Problem_Detected" in str(e):
+                print(f'Step: {k} / {l}, Non feasible initial state found: {x}')
+                no_viable.append([x[0], x[1], x[2], x[3]])
+            else:
+                print(f'Runtime error: {e}')
+    return viable, no_viable
 
 
 if __name__ == "__main__":
@@ -127,8 +146,8 @@ if __name__ == "__main__":
         state_array, n_ics = conf.grid(nq1, nv1, nq2, nv2)
     
     ## ==> AUGMENTATION OF THE DATASET:
-    # If dataset is already build, avoid to repeat same data and add only new I.C
-    data_path = "test54T.csv"     # Select the file from the current direcotry  
+    # If dataset is already build, avoid to repeat same data and add only new state 
+    data_path = "test54T.csv"                     # Select the file from the current direcotry  
     if (os.path.exists(data_path)):  
         data = np.genfromtxt(data_path, delimiter=",", skip_header=1) 
         old_data     = data[:,:-1]                # Extract all known points exept for the last column (viability) 
@@ -137,28 +156,6 @@ if __name__ == "__main__":
         # New state array: created by insert all data which are not in known_points
         state_array = np.array([point for point in state_array if tuple(point) not in known_points])
         n_ics = state_array.shape[0]   # new value of n_ics
-    
-    
-    # State computation function
-    def ocp_function_double_pendulum(index):
-        viable,no_viable = [],[]
-        k = 0                            # Actual step for single process
-        l = int(n_ics / conf.processor)  # Total number of step for single process
-        # Select data 
-        for i in range(index[0], index[1]):
-            k = k + 1
-            x = state_array[i, :]
-            try:  
-                sol = ocp.solve(x, conf.N)
-                viable.append([x[0], x[1], x[2], x[3]])
-                print(f'Step: {k} / {l}, Feasible initial state found: {x}')
-            except RuntimeError as e:                     
-                if "Infeasible_Problem_Detected" in str(e):
-                    print(f'Step: {k} / {l}, Non feasible initial state found: {x}')
-                    no_viable.append([x[0], x[1], x[2], x[3]])
-                else:
-                    print(f'Runtime error: {e}')
-        return viable, no_viable
     
     
     ## ==> MULTIPROCESS  

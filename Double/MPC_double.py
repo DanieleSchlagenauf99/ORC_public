@@ -197,7 +197,7 @@ if __name__ == "__main__":
         actual_trajectory.append(np.array([sol.value(mpc.q1[1]), sol.value(mpc.v1[1]),sol.value(mpc.q2[1]), sol.value(mpc.v2[1])]))
         actual_inputs.append(np.array([sol.value(mpc.u1[0]), sol.value(mpc.u2[0])]))
 
-         ## ==> NEW GUESS
+        ## ==> NEW GUESS
         # Copy in the guess array the obtained solutions, except for the first step 
         new_state_guess[:-1, 0] = sol.value(mpc.q1[1:]).reshape(-1)
         new_state_guess[:-1, 1] = sol.value(mpc.v1[1:]).reshape(-1)
@@ -214,8 +214,9 @@ if __name__ == "__main__":
         new_state_guess[-1, 0] = next_state[0]
         new_state_guess[-1, 1] = next_state[1] 
         new_state_guess[-1, 2] = next_state[2]
-        new_state_guess[-1, 3] = next_state[3]  
-        new_input_guess[-1, 0] = last_input[0]     # copy last input in the last postion 
+        new_state_guess[-1, 3] = next_state[3] 
+        #  copy last inputs in the last postion 
+        new_input_guess[-1, 0] = last_input[0]     
         new_input_guess[-1, 1] = last_input[1]    
         
         print(f'Step: {i+1} / {conf.mpc_step}')
