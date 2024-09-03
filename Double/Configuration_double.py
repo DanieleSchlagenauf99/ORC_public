@@ -8,8 +8,8 @@ iter = 1000        # Max number of iteration
  
 
 ## ==> RANDOM
-rnd_augment   = 0           # flag
-n_rnd         = 18000       # Number of points 
+rnd_augment   = 1           # flag
+n_rnd         = 10       # Number of points 
 rnd_vel = 10                # Rnd new velocity bound
 rnd_pos_lower = 3/4*np.pi   # Rnd new position bound
 rnd_pos_upper = 5/4*np.pi   # Rnd new position bound

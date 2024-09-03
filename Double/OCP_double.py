@@ -147,7 +147,7 @@ if __name__ == "__main__":
     
     ## ==> AUGMENTATION OF THE DATASET:
     # If dataset is already build, avoid to repeat same data and add only new state 
-    data_path = "test54T.csv"                     # Select the file from the current direcotry  
+    data_path = "aa.csv"                     # Select the file from the current direcotry  
     if (os.path.exists(data_path)):  
         data = np.genfromtxt(data_path, delimiter=",", skip_header=1) 
         old_data     = data[:,:-1]                # Extract all known points exept for the last column (viability) 
